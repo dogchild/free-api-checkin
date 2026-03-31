@@ -27,6 +27,7 @@ jobs:
         env:
           CHECKIN_ENABLED: ${{ secrets.CHECKIN_ENABLED }}
           CHECKIN_DRY_RUN: ${{ secrets.CHECKIN_DRY_RUN }}
+          ICE_SUB2API_REFRESH_TOKEN: ${{ secrets.ICE_SUB2API_REFRESH_TOKEN }}
           # Add provider-specific secrets here when real site integrations are implemented.
           # EXAMPLE_COOKIE: ${{ secrets.EXAMPLE_COOKIE }}
           # EXAMPLE_TOKEN: ${{ secrets.EXAMPLE_TOKEN }}
