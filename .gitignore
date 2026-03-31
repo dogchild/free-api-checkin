@@ -148,6 +148,6 @@ target/
 # Claude / AI tool local config
 # =========================
 .claude/
-**/CLAUDE.md
+CLAUDE.md
 .codex/
 .cursor/
