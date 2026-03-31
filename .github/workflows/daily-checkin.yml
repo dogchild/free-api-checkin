@@ -1,0 +1,33 @@
+name: Daily Check-in
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 0 * * *'
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run daily check-in
+        env:
+          CHECKIN_ENABLED: ${{ secrets.CHECKIN_ENABLED }}
+          CHECKIN_DRY_RUN: ${{ secrets.CHECKIN_DRY_RUN }}
+          # Add provider-specific secrets here when real site integrations are implemented.
+          # EXAMPLE_COOKIE: ${{ secrets.EXAMPLE_COOKIE }}
+          # EXAMPLE_TOKEN: ${{ secrets.EXAMPLE_TOKEN }}
+        run: npm run checkin

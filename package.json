@@ -1,0 +1,23 @@
+{
+  "name": "free-api-checkin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Extensible daily check-in automation for public-benefit AI API sites.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "checkin": "tsx src/index.ts",
+    "checkin:dry": "tsx src/index.ts --dry-run"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.30",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.2"
+  }
+}
