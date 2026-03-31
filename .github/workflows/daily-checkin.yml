@@ -3,7 +3,8 @@ name: Daily Check-in
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 0 * * *'
+    # 00:30 Asia/Shanghai = 16:30 UTC on the previous day.
+    - cron: '30 16 * * *'
 
 jobs:
   checkin:
@@ -26,8 +27,8 @@ jobs:
       - name: Run daily check-in
         env:
           CHECKIN_ENABLED: ${{ secrets.CHECKIN_ENABLED }}
-          CHECKIN_DRY_RUN: ${{ secrets.CHECKIN_DRY_RUN }}
-          ICE_SUB2API_REFRESH_TOKEN: ${{ secrets.ICE_SUB2API_REFRESH_TOKEN }}
+          ICE_SUB2API_AUTH_TOKEN: ${{ secrets.ICE_SUB2API_AUTH_TOKEN }}
+          ICE_SUB2API_USER_ID: ${{ secrets.ICE_SUB2API_USER_ID }}
           # Add provider-specific secrets here when real site integrations are implemented.
           # EXAMPLE_COOKIE: ${{ secrets.EXAMPLE_COOKIE }}
           # EXAMPLE_TOKEN: ${{ secrets.EXAMPLE_TOKEN }}
