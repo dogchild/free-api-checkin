@@ -22,7 +22,7 @@ The current `ice.v.ua` integration reuses the main-site `auth_token + user_id`, 
 
 ## Tech Stack
 
-- Node.js 20+
+- Node.js 22+
 - TypeScript
 - GitHub Actions
 
