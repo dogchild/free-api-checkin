@@ -1,16 +1,17 @@
 # CLAUDE.md
 
-This repository is an extensible automation scaffold for daily check-ins on public-benefit LLM API websites.
+This repository is an extensible automation project for daily check-ins on public-benefit LLM API websites.
 
 ## Project Goal
 
 Build a provider-based check-in system that can support multiple websites and run automatically through GitHub Actions.
 
 At the current stage:
-- the repository contains only the framework
-- no real website integration has been implemented yet
+- the repository already includes the reusable framework
+- one real website integration has been implemented: `ice.v.ua`
 - provider registration is explicit and centralized
 - configuration is environment-variable based
+- the current GitHub Actions schedule runs daily at 00:30 Asia/Shanghai
 
 ## Key Files
 
@@ -20,6 +21,7 @@ At the current stage:
 - `src/core/runner.ts` — provider execution and summary reporting
 - `src/providers/index.ts` — provider registry
 - `src/providers/example.ts` — placeholder provider
+- `src/providers/ice.ts` — real `ice.v.ua` provider using main-site auth token reuse
 - `.github/workflows/daily-checkin.yml` — scheduled/manual GitHub Actions workflow
 - `.env.example` — environment variable template
 
@@ -42,11 +44,20 @@ When adding a provider:
 - return standardized `success`, `skip`, or `fail` results
 - log through the provided `context.log()` function
 
+Current real provider semantics:
+- `ice` uses `ICE_SUB2API_AUTH_TOKEN` and `ICE_SUB2API_USER_ID`
+- `ice` treats both `签到成功` and `今日已签到` as successful outcomes
+- `ice` currently depends on reusing a manually obtained main-site auth token rather than automating upstream OAuth
+
 ## Configuration Conventions
 
 Current shared variables:
 - `CHECKIN_ENABLED`
-- `CHECKIN_DRY_RUN`
+- `CHECKIN_DRY_RUN` (optional; omitted means `false`)
+
+Current `ice` provider variables:
+- `ICE_SUB2API_AUTH_TOKEN`
+- `ICE_SUB2API_USER_ID`
 
 Future provider-specific variables should use uppercase prefixes, for example:
 - `SITE_A_COOKIE`
@@ -62,6 +73,13 @@ The workflow should remain simple:
 
 Any new provider secret needed by the runtime should be mapped in `.github/workflows/daily-checkin.yml`.
 
+For the current `ice` integration, the workflow expects these repository secrets:
+- `CHECKIN_ENABLED`
+- `ICE_SUB2API_AUTH_TOKEN`
+- `ICE_SUB2API_USER_ID`
+
+`CHECKIN_DRY_RUN` is mainly for local or manual verification and is not required as a normal scheduled workflow secret.
+
 ## Implementation Guidance
 
 When modifying this project:
@@ -70,8 +88,13 @@ When modifying this project:
 - keep logs clear for GitHub Actions output
 - avoid overengineering or premature abstractions
 - keep code and comments in English
-- keep documentation aligned with the actual scaffold state
+- keep documentation aligned with the actual project state
 
 ## Current Limitation
 
-This repository is not yet a complete check-in solution. It is only the extensible base for future site integrations.
+This repository already contains one real site integration, but it is still not a complete universal check-in solution.
+
+Current practical limitations:
+- only `ice.v.ua` is implemented as a real provider
+- the `ice` provider currently relies on a manually refreshed main-site auth token
+- long-term unattended token rotation has not been solved yet

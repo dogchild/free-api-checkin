@@ -1,17 +1,24 @@
 # Free API Check-in
 
-An extensible project scaffold for **automated daily check-ins on public-benefit LLM API websites**.
+An extensible TypeScript project for **automated daily check-ins on public-benefit LLM API websites**.
 
-The current version provides only the general framework and does not include any real site integrations yet. The goal is to add multiple supported sites over time and run them automatically every day with GitHub Actions.
+The repository already includes:
+
+- A general provider-based framework
+- A side-effect-free `example` provider
+- A real integrated provider for `ice.v.ua`
+
+The current `ice.v.ua` integration reuses the main-site `auth_token + user_id`, then completes the embedded sign-in flow through `signv.ice.v.ua` without browser automation.
 
 ## Features
 
 - Unified entrypoint for multiple check-in sites
 - Provider-based architecture for adding or removing sites
-- Enable specific providers through environment variables
-- Supports `--dry-run` mode
-- Designed for daily execution in GitHub Actions
-- Includes a side-effect-free example provider
+- Enable multiple providers via a comma-separated environment variable
+- Optional global `--dry-run` / `CHECKIN_DRY_RUN`
+- Designed for manual and scheduled GitHub Actions execution
+- Includes a real `ice.v.ua` check-in implementation
+- Treats both `签到成功` and `今日已签到` as successful outcomes
 
 ## Tech Stack
 
@@ -33,6 +40,7 @@ The current version provides only the general framework and does not include any
 │  │  └─ types.ts
 │  ├─ providers/
 │  │  ├─ example.ts
+│  │  ├─ ice.ts
 │  │  └─ index.ts
 │  └─ index.ts
 ├─ .env.example
@@ -59,46 +67,52 @@ Main entrypoint: `src/index.ts`
 See `.env.example`:
 
 ```env
-CHECKIN_ENABLED=example
-CHECKIN_DRY_RUN=false
+CHECKIN_ENABLED=ice
+# CHECKIN_DRY_RUN=true
+ICE_SUB2API_AUTH_TOKEN=
+ICE_SUB2API_USER_ID=
 ```
 
 Meaning:
 
-- `CHECKIN_ENABLED`: comma-separated provider IDs
-- `CHECKIN_DRY_RUN`: enables global dry-run mode
+- `CHECKIN_ENABLED`: comma-separated provider IDs, such as `ice` or `ice,site_a`
+- `CHECKIN_DRY_RUN`: optional; defaults to `false` when omitted, and only becomes `true` when explicitly set
+- `ICE_SUB2API_AUTH_TOKEN`: copy from browser `localStorage.auth_token` after signing into `ice.v.ua`
+- `ICE_SUB2API_USER_ID`: copy from `auth_user.id` or from the embedded page `user_id`
 
-When real providers are added later, you can extend it with variables like:
-
-```env
-SITE_A_COOKIE=
-SITE_A_TOKEN=
-```
+Note: the current `ice.v.ua` approach depends on the main-site `auth_token`, which will expire over time. If you use it in GitHub Actions, you must manually refresh the matching secret when it expires.
 
 ## Local Development
 
 ### Install dependencies
 
-```bash
+```powershell
 npm install
 ```
 
 ### Build
 
-```bash
+```powershell
 npm run build
 ```
 
-### Run in dry-run mode
+### Run `ice` in dry-run mode
 
-```bash
-CHECKIN_ENABLED=example npm run checkin:dry
+```powershell
+$env:CHECKIN_ENABLED="ice"
+$env:CHECKIN_DRY_RUN="true"
+$env:ICE_SUB2API_AUTH_TOKEN="dummy-token"
+$env:ICE_SUB2API_USER_ID="6702"
+npm run checkin
 ```
 
-### Run normally
+### Run `ice` normally
 
-```bash
-CHECKIN_ENABLED=example npm run checkin
+```powershell
+$env:CHECKIN_ENABLED="ice"
+$env:ICE_SUB2API_AUTH_TOKEN="your-auth-token"
+$env:ICE_SUB2API_USER_ID="6702"
+npm run checkin
 ```
 
 ## Add a New Provider
@@ -116,30 +130,38 @@ The interface definition is in `src/core/types.ts`.
 Workflow file: `.github/workflows/daily-checkin.yml`
 
 Currently supported:
+
 - Manual trigger via `workflow_dispatch`
 - Daily scheduled execution via `schedule`
 
-You should configure repository secrets such as:
+The current schedule is **00:30 Asia/Shanghai every day**.
+Because GitHub Actions uses UTC, the cron expression is configured as `16:30 UTC` on the previous day.
 
-- `CHECKIN_ENABLED`
-- `CHECKIN_DRY_RUN`
-- Future provider-specific values like `SITE_A_COOKIE`
+At minimum, configure these repository secrets:
+
+- `CHECKIN_ENABLED`: for example `ice`, or `ice,site_a` in the future
+- `ICE_SUB2API_AUTH_TOKEN`
+- `ICE_SUB2API_USER_ID`
+
+`CHECKIN_DRY_RUN` is not needed as a normal secret for scheduled GitHub execution. It is mainly useful for local debugging or temporary manual verification.
 
 ## Current Status
 
-The repository currently contains only the scaffold:
+The repository is no longer just a scaffold. It now includes:
 
-- Shared runner logic is in place
-- Provider registry is in place
-- Example provider is included
-- No real public-benefit site has been integrated yet
+- Shared runner logic
+- Provider registry
+- An `example` provider
+- A real working `ice.v.ua` provider
+- Verified success semantics for the actual check-in flow
 
 ## Roadmap
 
-- Integrate the first real site
-- Support different check-in styles such as Cookie / Token / page button
+- Integrate more real public-benefit sites
+- Support more session reuse patterns
 - Introduce browser automation only if a real site requires it
 - Improve logging and error categorization
+- Evaluate a more stable token update strategy in the future
 
 ## Notes
 
