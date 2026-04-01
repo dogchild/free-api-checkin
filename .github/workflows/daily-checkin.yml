@@ -29,6 +29,8 @@ jobs:
           CHECKIN_ENABLED: ${{ secrets.CHECKIN_ENABLED }}
           ICE_SUB2API_AUTH_TOKEN: ${{ secrets.ICE_SUB2API_AUTH_TOKEN }}
           ICE_SUB2API_USER_ID: ${{ secrets.ICE_SUB2API_USER_ID }}
+          ELYSIVER_AUTH_TOKEN: ${{ secrets.ELYSIVER_AUTH_TOKEN }}
+          ELYSIVER_USER_ID: ${{ secrets.ELYSIVER_USER_ID }}
           # Add provider-specific secrets here when real site integrations are implemented.
           # EXAMPLE_COOKIE: ${{ secrets.EXAMPLE_COOKIE }}
           # EXAMPLE_TOKEN: ${{ secrets.EXAMPLE_TOKEN }}

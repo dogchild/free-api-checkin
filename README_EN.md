@@ -6,9 +6,12 @@ The repository already includes:
 
 - A general provider-based framework
 - A side-effect-free `example` provider
-- A real integrated provider for `ice.v.ua`
+- A real integrated check-in provider for `ice.v.ua`
+- An auth-only provider for `elysiver.h-e.top`
 
 The current `ice.v.ua` integration reuses the main-site `auth_token + user_id`, then completes the embedded sign-in flow through `signv.ice.v.ua` without browser automation.
+
+The current `elysiver.h-e.top` integration only verifies whether auth restoration based on the site's NewAPI login state still works. Its custom daily sign-in logic has not been implemented yet.
 
 ## Features
 
@@ -18,6 +21,7 @@ The current `ice.v.ua` integration reuses the main-site `auth_token + user_id`, 
 - Optional global `--dry-run` / `CHECKIN_DRY_RUN`
 - Designed for manual and scheduled GitHub Actions execution
 - Includes a real `ice.v.ua` check-in implementation
+- Includes auth restoration verification for `elysiver.h-e.top`
 - Treats both `签到成功` and `今日已签到` as successful outcomes
 
 ## Tech Stack
@@ -39,6 +43,7 @@ The current `ice.v.ua` integration reuses the main-site `auth_token + user_id`, 
 │  │  ├─ runner.ts
 │  │  └─ types.ts
 │  ├─ providers/
+│  │  ├─ elysiver.ts
 │  │  ├─ example.ts
 │  │  ├─ ice.ts
 │  │  └─ index.ts
@@ -71,16 +76,23 @@ CHECKIN_ENABLED=ice
 # CHECKIN_DRY_RUN=true
 ICE_SUB2API_AUTH_TOKEN=
 ICE_SUB2API_USER_ID=
+ELYSIVER_AUTH_TOKEN=
+ELYSIVER_USER_ID=
 ```
 
 Meaning:
 
-- `CHECKIN_ENABLED`: comma-separated provider IDs, such as `ice` or `ice,site_a`
+- `CHECKIN_ENABLED`: comma-separated provider IDs, such as `ice`, `elysiver`, or `ice,elysiver`
 - `CHECKIN_DRY_RUN`: optional; defaults to `false` when omitted, and only becomes `true` when explicitly set
 - `ICE_SUB2API_AUTH_TOKEN`: copy from browser `localStorage.auth_token` after signing into `ice.v.ua`
 - `ICE_SUB2API_USER_ID`: copy from `auth_user.id` or from the embedded page `user_id`
+- `ELYSIVER_AUTH_TOKEN`: copy from the `elysiver.h-e.top` NewAPI login state or from an authenticated request header
+- `ELYSIVER_USER_ID`: copy from `localStorage.user.id` after signing into `elysiver.h-e.top`
 
-Note: the current `ice.v.ua` approach depends on the main-site `auth_token`, which will expire over time. If you use it in GitHub Actions, you must manually refresh the matching secret when it expires.
+Notes:
+
+- The current `ice.v.ua` approach depends on the main-site `auth_token`, which will expire over time. If you use it in GitHub Actions, you must manually refresh the matching secret when it expires.
+- The current `elysiver.h-e.top` provider is only an auth restoration probe. It confirms that a manually copied login state still works, but it does not implement the real daily sign-in flow yet.
 
 ## Local Development
 
@@ -106,6 +118,16 @@ $env:ICE_SUB2API_USER_ID="6702"
 npm run checkin
 ```
 
+### Run the `elysiver` auth probe in dry-run mode
+
+```powershell
+$env:CHECKIN_ENABLED="elysiver"
+$env:CHECKIN_DRY_RUN="true"
+$env:ELYSIVER_AUTH_TOKEN="dummy-token"
+$env:ELYSIVER_USER_ID="123"
+npm run checkin
+```
+
 ### Run `ice` normally
 
 ```powershell
@@ -114,6 +136,20 @@ $env:ICE_SUB2API_AUTH_TOKEN="your-auth-token"
 $env:ICE_SUB2API_USER_ID="6702"
 npm run checkin
 ```
+
+### Run the `elysiver` auth probe normally
+
+```powershell
+$env:CHECKIN_ENABLED="elysiver"
+$env:ELYSIVER_AUTH_TOKEN="your-auth-token"
+$env:ELYSIVER_USER_ID="123"
+npm run checkin
+```
+
+Expected behavior:
+
+- `ice` performs the real daily sign-in flow or reports that today's sign-in was already completed
+- `elysiver` only verifies auth restoration and explicitly reports that daily check-in is not implemented yet
 
 ## Add a New Provider
 
@@ -139,11 +175,15 @@ Because GitHub Actions uses UTC, the cron expression is configured as `16:30 UTC
 
 At minimum, configure these repository secrets:
 
-- `CHECKIN_ENABLED`: for example `ice`, or `ice,site_a` in the future
+- `CHECKIN_ENABLED`: for example `ice`, `elysiver`, or `ice,elysiver`
 - `ICE_SUB2API_AUTH_TOKEN`
 - `ICE_SUB2API_USER_ID`
+- `ELYSIVER_AUTH_TOKEN`
+- `ELYSIVER_USER_ID`
 
 `CHECKIN_DRY_RUN` is not needed as a normal secret for scheduled GitHub execution. It is mainly useful for local debugging or temporary manual verification.
+
+Until the real `elysiver` sign-in flow is implemented, it is better to validate it through `workflow_dispatch` first instead of treating it as a fully automated scheduled provider.
 
 ## Current Status
 
@@ -153,10 +193,12 @@ The repository is no longer just a scaffold. It now includes:
 - Provider registry
 - An `example` provider
 - A real working `ice.v.ua` provider
-- Verified success semantics for the actual check-in flow
+- An auth-only `elysiver.h-e.top` provider
+- Verified success semantics for the actual `ice` check-in flow
 
 ## Roadmap
 
+- Implement the custom `elysiver.h-e.top` sign-in flow after packet capture
 - Integrate more real public-benefit sites
 - Support more session reuse patterns
 - Introduce browser automation only if a real site requires it

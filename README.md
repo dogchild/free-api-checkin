@@ -6,9 +6,12 @@
 
 - 通用 provider 框架
 - 一个无副作用的 `example` provider
-- 一个已接入的真实站点 provider：`ice.v.ua`
+- 一个已接入的真实签到 provider：`ice.v.ua`
+- 一个已接入的 auth-only provider：`elysiver.h-e.top`
 
 `ice.v.ua` 当前通过主站 `auth_token + user_id` 复用登录态，再走 `signv.ice.v.ua` 的嵌入式签到流程完成签到，不依赖浏览器自动化。
+
+`elysiver.h-e.top` 当前仅验证基于 NewAPI 登录态的 auth restoration 是否有效，尚未实现网站自定义的“立即签到”逻辑。
 
 ## Features
 
@@ -18,6 +21,7 @@
 - 支持可选的全局 `--dry-run` / `CHECKIN_DRY_RUN`
 - 适配 GitHub Actions 手动与定时执行
 - 已提供真实的 `ice.v.ua` 签到实现
+- 已提供 `elysiver.h-e.top` 的登录恢复验证
 - 将“签到成功”和“今日已签到”都视为成功结果
 
 ## Tech Stack
@@ -39,6 +43,7 @@
 │  │  ├─ runner.ts
 │  │  └─ types.ts
 │  ├─ providers/
+│  │  ├─ elysiver.ts
 │  │  ├─ example.ts
 │  │  ├─ ice.ts
 │  │  └─ index.ts
@@ -71,16 +76,23 @@ CHECKIN_ENABLED=ice
 # CHECKIN_DRY_RUN=true
 ICE_SUB2API_AUTH_TOKEN=
 ICE_SUB2API_USER_ID=
+ELYSIVER_AUTH_TOKEN=
+ELYSIVER_USER_ID=
 ```
 
 说明：
 
-- `CHECKIN_ENABLED`：逗号分隔的 provider ID 列表，例如 `ice` 或 `ice,site_a`
+- `CHECKIN_ENABLED`：逗号分隔的 provider ID 列表，例如 `ice`、`elysiver` 或 `ice,elysiver`
 - `CHECKIN_DRY_RUN`：可选；未设置时默认 `false`，仅在显式设为 `true` 时启用 dry-run
 - `ICE_SUB2API_AUTH_TOKEN`：从 `ice.v.ua` 登录后的浏览器 `localStorage.auth_token` 获取
 - `ICE_SUB2API_USER_ID`：从 `auth_user.id` 或页面 iframe 中的 `user_id` 获取
+- `ELYSIVER_AUTH_TOKEN`：从 `elysiver.h-e.top` 登录后的 NewAPI 登录态或已认证请求头中获取
+- `ELYSIVER_USER_ID`：从 `elysiver.h-e.top` 登录后的 `localStorage.user.id` 获取
 
-说明：当前 `ice.v.ua` 方案依赖主站 `auth_token`，该值会过期。若用于 GitHub Actions，请在失效后手动更新对应 Secret。
+说明：
+
+- 当前 `ice.v.ua` 方案依赖主站 `auth_token`，该值会过期。若用于 GitHub Actions，请在失效后手动更新对应 Secret。
+- 当前 `elysiver.h-e.top` 仅实现 auth restoration probe，用于确认手工复制的登录态仍然有效，不代表已实现签到。
 
 ## Local Development
 
@@ -106,6 +118,16 @@ $env:ICE_SUB2API_USER_ID="6702"
 npm run checkin
 ```
 
+### Run `elysiver` auth probe in dry-run mode
+
+```powershell
+$env:CHECKIN_ENABLED="elysiver"
+$env:CHECKIN_DRY_RUN="true"
+$env:ELYSIVER_AUTH_TOKEN="dummy-token"
+$env:ELYSIVER_USER_ID="123"
+npm run checkin
+```
+
 ### Run `ice` normally
 
 ```powershell
@@ -114,6 +136,20 @@ $env:ICE_SUB2API_AUTH_TOKEN="your-auth-token"
 $env:ICE_SUB2API_USER_ID="6702"
 npm run checkin
 ```
+
+### Run `elysiver` auth probe normally
+
+```powershell
+$env:CHECKIN_ENABLED="elysiver"
+$env:ELYSIVER_AUTH_TOKEN="your-auth-token"
+$env:ELYSIVER_USER_ID="123"
+npm run checkin
+```
+
+期望结果：
+
+- `ice` 成功时会执行真实签到，或返回今日已签到
+- `elysiver` 成功时只表示登录恢复验证通过，并会明确提示签到尚未实现
 
 ## Add a New Provider
 
@@ -139,11 +175,15 @@ npm run checkin
 
 你至少需要在 GitHub 仓库中配置这些 Secrets：
 
-- `CHECKIN_ENABLED`：例如 `ice`，或未来使用 `ice,site_a`
+- `CHECKIN_ENABLED`：例如 `ice`、`elysiver`，或未来使用 `ice,elysiver`
 - `ICE_SUB2API_AUTH_TOKEN`
 - `ICE_SUB2API_USER_ID`
+- `ELYSIVER_AUTH_TOKEN`
+- `ELYSIVER_USER_ID`
 
 `CHECKIN_DRY_RUN` 不需要作为 GitHub 自动任务的常规 Secret。它更适合本地调试或手动验证时临时设置。
+
+在 `elysiver` 真正签到逻辑完成前，不建议把 `elysiver` 作为长期定时任务的唯一目标；更适合先通过 `workflow_dispatch` 手动验证 auth restoration。
 
 ## Current Status
 
@@ -153,10 +193,12 @@ npm run checkin
 - 已有 provider 注册机制
 - 已有 `example` provider
 - 已有真实可用的 `ice.v.ua` provider
+- 已有 `elysiver.h-e.top` 的 auth-only provider
 - 真实签到成功语义已验证
 
 ## Roadmap
 
+- 完成 `elysiver.h-e.top` 的自定义签到抓包与实现
 - 接入更多真实公益站点
 - 支持更多登录态复用方式
 - 视需要引入浏览器自动化
