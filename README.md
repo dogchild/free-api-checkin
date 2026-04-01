@@ -11,7 +11,7 @@
 
 `ice.v.ua` 当前通过主站 `auth_token + user_id` 复用登录态，再走 `signv.ice.v.ua` 的嵌入式签到流程完成签到，不依赖浏览器自动化。
 
-`elysiver.h-e.top` 当前仅验证基于 NewAPI 登录态的 auth restoration 是否有效，尚未实现网站自定义的“立即签到”逻辑。
+`elysiver.h-e.top` 当前仅验证基于整段 Cookie 的 auth restoration 是否有效，尚未实现网站自定义的“立即签到”逻辑。
 
 ## Features
 
@@ -76,7 +76,7 @@ CHECKIN_ENABLED=ice
 # CHECKIN_DRY_RUN=true
 ICE_SUB2API_AUTH_TOKEN=
 ICE_SUB2API_USER_ID=
-ELYSIVER_AUTH_TOKEN=
+ELYSIVER_COOKIE=
 ELYSIVER_USER_ID=
 ```
 
@@ -86,13 +86,13 @@ ELYSIVER_USER_ID=
 - `CHECKIN_DRY_RUN`：可选；未设置时默认 `false`，仅在显式设为 `true` 时启用 dry-run
 - `ICE_SUB2API_AUTH_TOKEN`：从 `ice.v.ua` 登录后的浏览器 `localStorage.auth_token` 获取
 - `ICE_SUB2API_USER_ID`：从 `auth_user.id` 或页面 iframe 中的 `user_id` 获取
-- `ELYSIVER_AUTH_TOKEN`：从 `elysiver.h-e.top` 登录后的 NewAPI 登录态或已认证请求头中获取
+- `ELYSIVER_COOKIE`：从 `elysiver.h-e.top` 登录后的浏览器中复制完整 Cookie 字符串，例如 `session=...; cf_clearance=...;`。`session` 和 `cf_clearance` 的顺序无所谓。
 - `ELYSIVER_USER_ID`：从 `elysiver.h-e.top` 登录后的 `localStorage.user.id` 获取
 
 说明：
 
 - 当前 `ice.v.ua` 方案依赖主站 `auth_token`，该值会过期。若用于 GitHub Actions，请在失效后手动更新对应 Secret。
-- 当前 `elysiver.h-e.top` 仅实现 auth restoration probe，用于确认手工复制的登录态仍然有效，不代表已实现签到。
+- 当前 `elysiver.h-e.top` 仅实现 auth restoration probe，用于确认手工复制的整段 Cookie 仍然有效，不代表已实现签到。
 
 ## Local Development
 
@@ -123,8 +123,8 @@ npm run checkin
 ```powershell
 $env:CHECKIN_ENABLED="elysiver"
 $env:CHECKIN_DRY_RUN="true"
-$env:ELYSIVER_AUTH_TOKEN="dummy-token"
-$env:ELYSIVER_USER_ID="123"
+$env:ELYSIVER_COOKIE="session=dummy-session; cf_clearance=dummy-clearance;"
+$env:ELYSIVER_USER_ID="19139"
 npm run checkin
 ```
 
@@ -141,8 +141,8 @@ npm run checkin
 
 ```powershell
 $env:CHECKIN_ENABLED="elysiver"
-$env:ELYSIVER_AUTH_TOKEN="your-auth-token"
-$env:ELYSIVER_USER_ID="123"
+$env:ELYSIVER_COOKIE="session=your-session-cookie; cf_clearance=your-cf-clearance;"
+$env:ELYSIVER_USER_ID="19139"
 npm run checkin
 ```
 
@@ -178,7 +178,7 @@ npm run checkin
 - `CHECKIN_ENABLED`：例如 `ice`、`elysiver`，或未来使用 `ice,elysiver`
 - `ICE_SUB2API_AUTH_TOKEN`
 - `ICE_SUB2API_USER_ID`
-- `ELYSIVER_AUTH_TOKEN`
+- `ELYSIVER_COOKIE`
 - `ELYSIVER_USER_ID`
 
 `CHECKIN_DRY_RUN` 不需要作为 GitHub 自动任务的常规 Secret。它更适合本地调试或手动验证时临时设置。

@@ -4,7 +4,7 @@ const ELYSIVER_PROVIDER_ID = "elysiver";
 const ELYSIVER_PROVIDER_NAME = "elysiver.h-e.top";
 const ELYSIVER_BASE_URL = "https://elysiver.h-e.top";
 const ELYSIVER_SELF_PATH = "/api/user/self";
-const ELYSIVER_AUTH_TOKEN_ENV = "ELYSIVER_AUTH_TOKEN";
+const ELYSIVER_COOKIE_ENV = "ELYSIVER_COOKIE";
 const ELYSIVER_USER_ID_ENV = "ELYSIVER_USER_ID";
 const ELYSIVER_REQUEST_TIMEOUT_MS = 15_000;
 
@@ -27,11 +27,11 @@ interface ElysiverUserSelfResponse {
 export const elysiverProvider: CheckInProvider = {
   id: ELYSIVER_PROVIDER_ID,
   displayName: ELYSIVER_PROVIDER_NAME,
-  requiredEnv: [ELYSIVER_AUTH_TOKEN_ENV, ELYSIVER_USER_ID_ENV],
+  requiredEnv: [ELYSIVER_COOKIE_ENV, ELYSIVER_USER_ID_ENV],
   async run(context) {
-    // Phase 1 for elysiver only verifies that a manually recovered NewAPI login
-    // state is still accepted by the site. The real daily check-in flow will be
-    // analyzed separately after auth restoration is confirmed to work.
+    // Phase 1 for elysiver only verifies that a manually recovered cookie-based
+    // login state is still accepted by the site. The real daily check-in flow
+    // will be analyzed separately after auth restoration is confirmed to work.
     if (context.dryRun) {
       context.log("Dry-run mode is enabled. No request is sent to elysiver.h-e.top.");
 
@@ -40,29 +40,26 @@ export const elysiverProvider: CheckInProvider = {
         providerName: ELYSIVER_PROVIDER_NAME,
         status: "skip",
         message:
-          "Dry-run would call the NewAPI user-self endpoint with ELYSIVER_AUTH_TOKEN and ELYSIVER_USER_ID to verify auth restoration.",
+          "Dry-run would call the NewAPI user-self endpoint with ELYSIVER_COOKIE and ELYSIVER_USER_ID to verify auth restoration.",
       };
     }
 
-    const authToken = context.env[ELYSIVER_AUTH_TOKEN_ENV]?.trim();
+    const cookieHeader = normalizeCookieHeader(context.env[ELYSIVER_COOKIE_ENV]);
     const expectedUserId = context.env[ELYSIVER_USER_ID_ENV]?.trim();
 
-    if (!authToken || !expectedUserId) {
+    if (!cookieHeader || !expectedUserId) {
       throw new Error(
-        `Missing required environment variables: ${[ELYSIVER_AUTH_TOKEN_ENV, ELYSIVER_USER_ID_ENV].join(", ")}`,
+        `Missing required environment variables: ${[ELYSIVER_COOKIE_ENV, ELYSIVER_USER_ID_ENV].join(", ")}`,
       );
     }
 
-    context.log("Verifying the restored NewAPI login state through /api/user/self.");
+    context.log("Verifying the restored cookie-based login state through /api/user/self.");
     const selfResponse = await requestJson(`${ELYSIVER_BASE_URL}${ELYSIVER_SELF_PATH}`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${authToken}`,
-        // Mirror the authenticated API pattern observed on the NewAPI frontend so
-        // the check stays close to the real browser flow.
+        Cookie: cookieHeader,
         "New-API-User": expectedUserId,
-        Origin: ELYSIVER_BASE_URL,
-        Referer: `${ELYSIVER_BASE_URL}/console/personal`,
+        Referer: `${ELYSIVER_BASE_URL}/console`,
       },
     });
 
@@ -71,6 +68,14 @@ export const elysiverProvider: CheckInProvider = {
     }
 
     const payload = parseUserSelfResponse(selfResponse.body);
+
+    if (payload.success === false) {
+      const message = payload.message?.trim();
+      throw new Error(
+        `The NewAPI user-self response reported success=false.${message ? ` Message: ${message}.` : ""} Response: ${summarizeBody(selfResponse.body)}`,
+      );
+    }
+
     const actualUserId = extractUserId(payload);
 
     if (!actualUserId) {
@@ -97,11 +102,25 @@ export const elysiverProvider: CheckInProvider = {
   },
 };
 
+function normalizeCookieHeader(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value
+    .split(";")
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .join("; ");
+
+  return normalized || null;
+}
+
 function buildAuthVerificationError(response: Response, body: string): string {
   const summary = summarizeBody(body);
 
   if (response.status === 401 || response.status === 403) {
-    return `Failed to verify the restored login because ELYSIVER_AUTH_TOKEN is invalid or expired, or ELYSIVER_USER_ID does not match the token. HTTP ${response.status} ${response.statusText}. Response: ${summary}`;
+    return `Failed to verify the restored login because ELYSIVER_COOKIE is invalid or expired, ELYSIVER_USER_ID does not match the session, or the site requires fresher cookies. HTTP ${response.status} ${response.statusText}. Response: ${summary}`;
   }
 
   return `The NewAPI user-self request failed with ${response.status} ${response.statusText}: ${summary}`;

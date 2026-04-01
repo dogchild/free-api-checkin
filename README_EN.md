@@ -11,7 +11,7 @@ The repository already includes:
 
 The current `ice.v.ua` integration reuses the main-site `auth_token + user_id`, then completes the embedded sign-in flow through `signv.ice.v.ua` without browser automation.
 
-The current `elysiver.h-e.top` integration only verifies whether auth restoration based on the site's NewAPI login state still works. Its custom daily sign-in logic has not been implemented yet.
+The current `elysiver.h-e.top` integration only verifies whether restoration based on the full Cookie header still works. Its custom daily sign-in logic has not been implemented yet.
 
 ## Features
 
@@ -76,7 +76,7 @@ CHECKIN_ENABLED=ice
 # CHECKIN_DRY_RUN=true
 ICE_SUB2API_AUTH_TOKEN=
 ICE_SUB2API_USER_ID=
-ELYSIVER_AUTH_TOKEN=
+ELYSIVER_COOKIE=
 ELYSIVER_USER_ID=
 ```
 
@@ -86,13 +86,13 @@ Meaning:
 - `CHECKIN_DRY_RUN`: optional; defaults to `false` when omitted, and only becomes `true` when explicitly set
 - `ICE_SUB2API_AUTH_TOKEN`: copy from browser `localStorage.auth_token` after signing into `ice.v.ua`
 - `ICE_SUB2API_USER_ID`: copy from `auth_user.id` or from the embedded page `user_id`
-- `ELYSIVER_AUTH_TOKEN`: copy from the `elysiver.h-e.top` NewAPI login state or from an authenticated request header
+- `ELYSIVER_COOKIE`: copy the full Cookie string after signing into `elysiver.h-e.top`, for example `session=...; cf_clearance=...;`. The order of cookie fields does not matter.
 - `ELYSIVER_USER_ID`: copy from `localStorage.user.id` after signing into `elysiver.h-e.top`
 
 Notes:
 
 - The current `ice.v.ua` approach depends on the main-site `auth_token`, which will expire over time. If you use it in GitHub Actions, you must manually refresh the matching secret when it expires.
-- The current `elysiver.h-e.top` provider is only an auth restoration probe. It confirms that a manually copied login state still works, but it does not implement the real daily sign-in flow yet.
+- The current `elysiver.h-e.top` provider is only an auth restoration probe. It confirms that a manually copied full Cookie string still works, but it does not implement the real daily sign-in flow yet.
 
 ## Local Development
 
@@ -123,8 +123,8 @@ npm run checkin
 ```powershell
 $env:CHECKIN_ENABLED="elysiver"
 $env:CHECKIN_DRY_RUN="true"
-$env:ELYSIVER_AUTH_TOKEN="dummy-token"
-$env:ELYSIVER_USER_ID="123"
+$env:ELYSIVER_COOKIE="session=dummy-session; cf_clearance=dummy-clearance;"
+$env:ELYSIVER_USER_ID="19139"
 npm run checkin
 ```
 
@@ -141,8 +141,8 @@ npm run checkin
 
 ```powershell
 $env:CHECKIN_ENABLED="elysiver"
-$env:ELYSIVER_AUTH_TOKEN="your-auth-token"
-$env:ELYSIVER_USER_ID="123"
+$env:ELYSIVER_COOKIE="session=your-session-cookie; cf_clearance=your-cf-clearance;"
+$env:ELYSIVER_USER_ID="19139"
 npm run checkin
 ```
 
@@ -178,7 +178,7 @@ At minimum, configure these repository secrets:
 - `CHECKIN_ENABLED`: for example `ice`, `elysiver`, or `ice,elysiver`
 - `ICE_SUB2API_AUTH_TOKEN`
 - `ICE_SUB2API_USER_ID`
-- `ELYSIVER_AUTH_TOKEN`
+- `ELYSIVER_COOKIE`
 - `ELYSIVER_USER_ID`
 
 `CHECKIN_DRY_RUN` is not needed as a normal secret for scheduled GitHub execution. It is mainly useful for local debugging or temporary manual verification.
