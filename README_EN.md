@@ -1,208 +1,60 @@
 # Free API Check-in
 
-An extensible TypeScript project for **automated daily check-ins on public-benefit LLM API websites**.
+A project for **automated daily check-ins on public-benefit LLM API websites**.
 
-The repository already includes:
+Currently supported sites:
 
-- A general provider-based framework
-- A side-effect-free `example` provider
-- A real integrated check-in provider for `ice.v.ua`
-- A real integrated check-in provider for `elysiver.h-e.top`
+- `ice.v.ua`
+- `elysiver.h-e.top`
 
-The current `ice.v.ua` integration reuses the main-site `auth_token + user_id`, then completes the embedded sign-in flow through `signv.ice.v.ua` without browser automation.
+## GitHub Automation Usage
 
-The current `elysiver.h-e.top` integration reuses a cookie-based session, verifies `/api/user/self`, then calls `/api/user/checkin` to complete the daily sign-in flow. Both a successful sign-in and an already-completed-today state are treated as success.
+1. Fork or clone this repository into your own GitHub repository.
+2. Configure the required Secrets in **Settings -> Secrets and variables -> Actions**.
+3. Enable the GitHub Actions workflow.
+4. Wait for the daily scheduled run, or trigger it manually once for verification.
 
-## Features
+Current workflow file:
 
-- Unified entrypoint for multiple check-in sites
-- Provider-based architecture for adding or removing sites
-- Enable multiple providers via a comma-separated environment variable
-- Optional global `--dry-run` / `CHECKIN_DRY_RUN`
-- Designed for manual and scheduled GitHub Actions execution
-- Includes a real `ice.v.ua` check-in implementation
-- Includes a real `elysiver.h-e.top` check-in implementation
-- Treats both `签到成功` and `今日已签到` as successful outcomes
+- `.github/workflows/daily-checkin.yml`
 
-## Tech Stack
+Current default schedule:
 
-- Node.js 22+
-- TypeScript
-- GitHub Actions
+- **00:30 Asia/Shanghai every day**
 
-## Project Structure
+### Required Secrets
 
-```text
-.
-├─ .github/
-│  └─ workflows/
-│     └─ daily-checkin.yml
-├─ src/
-│  ├─ core/
-│  │  ├─ config.ts
-│  │  ├─ runner.ts
-│  │  └─ types.ts
-│  ├─ providers/
-│  │  ├─ elysiver.ts
-│  │  ├─ example.ts
-│  │  ├─ ice.ts
-│  │  └─ index.ts
-│  └─ index.ts
-├─ .env.example
-├─ package.json
-├─ tsconfig.json
-├─ README.md
-├─ README_EN.md
-└─ CLAUDE.md
-```
+Shared variable:
 
-## How It Works
+- `CHECKIN_ENABLED`: set the enabled site IDs, such as `ice`, `elysiver`, or `ice,elysiver`
 
-1. Read the enabled provider list from environment variables
-2. Load registered providers from the registry
-3. Select only the providers requested for execution
-4. Validate required environment variables for each provider
-5. Run providers sequentially
-6. Print a summary and exit with a non-zero code if any provider fails
+For `ice.v.ua`:
 
-Main entrypoint: `src/index.ts`
-
-## Configuration
-
-See `.env.example`:
-
-```env
-CHECKIN_ENABLED=ice
-# CHECKIN_DRY_RUN=true
-ICE_SUB2API_AUTH_TOKEN=
-ICE_SUB2API_USER_ID=
-ELYSIVER_COOKIE=
-ELYSIVER_USER_ID=
-```
-
-Meaning:
-
-- `CHECKIN_ENABLED`: comma-separated provider IDs, such as `ice`, `elysiver`, or `ice,elysiver`
-- `CHECKIN_DRY_RUN`: optional; defaults to `false` when omitted, and only becomes `true` when explicitly set
-- `ICE_SUB2API_AUTH_TOKEN`: copy from browser `localStorage.auth_token` after signing into `ice.v.ua`
-- `ICE_SUB2API_USER_ID`: copy from `auth_user.id` or from the embedded page `user_id`
-- `ELYSIVER_COOKIE`: copy the full Cookie string after signing into `elysiver.h-e.top`, for example `session=...; cf_clearance=...;`. The order of cookie fields does not matter.
-- `ELYSIVER_USER_ID`: copy from `localStorage.user.id` after signing into `elysiver.h-e.top`
-
-Notes:
-
-- The current `ice.v.ua` approach depends on the main-site `auth_token`, which will expire over time. If you use it in GitHub Actions, you must manually refresh the matching secret when it expires.
-- The current `elysiver.h-e.top` approach depends on the full Cookie string. When the cookie expires or Cloudflare behavior changes, you must copy and update it again.
-
-## Local Development
-
-### Install dependencies
-
-```powershell
-npm install
-```
-
-### Build
-
-```powershell
-npm run build
-```
-
-### Run `ice` in dry-run mode
-
-```powershell
-$env:CHECKIN_ENABLED="ice"
-$env:CHECKIN_DRY_RUN="true"
-$env:ICE_SUB2API_AUTH_TOKEN="dummy-token"
-$env:ICE_SUB2API_USER_ID="6702"
-npm run checkin
-```
-
-### Run `elysiver` in dry-run mode
-
-```powershell
-$env:CHECKIN_ENABLED="elysiver"
-$env:CHECKIN_DRY_RUN="true"
-$env:ELYSIVER_COOKIE="session=dummy-session; cf_clearance=dummy-clearance;"
-$env:ELYSIVER_USER_ID="19139"
-npm run checkin
-```
-
-### Run `ice` normally
-
-```powershell
-$env:CHECKIN_ENABLED="ice"
-$env:ICE_SUB2API_AUTH_TOKEN="your-auth-token"
-$env:ICE_SUB2API_USER_ID="6702"
-npm run checkin
-```
-
-### Run `elysiver` normally
-
-```powershell
-$env:CHECKIN_ENABLED="elysiver"
-$env:ELYSIVER_COOKIE="session=your-session-cookie; cf_clearance=your-cf-clearance;"
-$env:ELYSIVER_USER_ID="19139"
-npm run checkin
-```
-
-Expected behavior:
-
-- `ice` performs the real daily sign-in flow or reports that today's sign-in was already completed
-- `elysiver` performs the real daily sign-in flow or reports that today's sign-in was already completed
-
-## Add a New Provider
-
-1. Create a new provider file under `src/providers/`
-2. Implement the `CheckInProvider` interface
-3. Register it in `src/providers/index.ts`
-4. Add the required environment variables
-5. Configure the matching GitHub Actions secrets
-
-The interface definition is in `src/core/types.ts`.
-
-## GitHub Actions
-
-Workflow file: `.github/workflows/daily-checkin.yml`
-
-Currently supported:
-
-- Manual trigger via `workflow_dispatch`
-- Daily scheduled execution via `schedule`
-
-The current schedule is **00:30 Asia/Shanghai every day**.
-Because GitHub Actions uses UTC, the cron expression is configured as `16:30 UTC` on the previous day.
-
-At minimum, configure these repository secrets:
-
-- `CHECKIN_ENABLED`: for example `ice`, `elysiver`, or `ice,elysiver`
 - `ICE_SUB2API_AUTH_TOKEN`
 - `ICE_SUB2API_USER_ID`
+
+For `elysiver.h-e.top`:
+
 - `ELYSIVER_COOKIE`
 - `ELYSIVER_USER_ID`
 
-`CHECKIN_DRY_RUN` is not needed as a normal secret for scheduled GitHub execution. It is mainly useful for local debugging or temporary manual verification.
+Notes:
+
+- You only need to configure the variables for the sites you enable.
+- If you enable multiple sites, configure the variables for all of them.
+- These login materials still need to be copied from the browser manually and refreshed again after they expire.
 
 ## Current Status
 
-The repository is no longer just a scaffold. It now includes:
+- The project already works with GitHub Actions automation
+- Two real public-benefit sites are already integrated
+- Different sites require different login materials, so their Secrets must be configured separately
 
-- Shared runner logic
-- Provider registry
-- An `example` provider
-- A real working `ice.v.ua` provider
-- A real working `elysiver.h-e.top` provider
-- Verified success semantics for the actual check-in flows
+## Future Plan
 
-## Roadmap
-
-- Integrate more real public-benefit sites
-- Support more session reuse patterns
-- Introduce browser automation only if a real site requires it
-- Improve logging and error categorization
-- Evaluate a more stable token update strategy in the future
+More public-benefit sites will be added in the future, and the automation workflow will continue to be improved for better stability and maintainability.
 
 ## Notes
 
 This project should only be used for automation within your own authorized accounts and scope.
-When integrating real sites, follow each website's terms of service and reasonable access limits.
+When integrating real sites, please follow each website's terms of service and reasonable access limits.

@@ -1,208 +1,60 @@
 # Free API Check-in
 
-一个用于**公益大模型 API 网站自动签到**的可扩展 TypeScript 项目。
+一个用于**公益大模型 API 网站自动签到**的项目。
 
-当前仓库已经包含：
+目前已经支持：
 
-- 通用 provider 框架
-- 一个无副作用的 `example` provider
-- 一个已接入的真实签到 provider：`ice.v.ua`
-- 一个已接入的真实签到 provider：`elysiver.h-e.top`
+- `ice.v.ua`
+- `elysiver.h-e.top`
 
-`ice.v.ua` 当前通过主站 `auth_token + user_id` 复用登录态，再走 `signv.ice.v.ua` 的嵌入式签到流程完成签到，不依赖浏览器自动化。
+## GitHub 自动任务使用方式
 
-`elysiver.h-e.top` 当前通过 Cookie session 复用登录态，先验证 `/api/user/self`，再调用 `/api/user/checkin` 完成签到，并将“今日已签到”视为成功。
+1. Fork 或克隆本仓库到你自己的 GitHub 仓库。
+2. 在仓库的 **Settings -> Secrets and variables -> Actions** 中配置运行所需的 Secrets。
+3. 在 GitHub Actions 中启用工作流。
+4. 等待每日自动执行，或手动触发一次验证。
 
-## Features
+当前工作流文件：
 
-- 支持多个站点的统一签到入口
-- 通过 provider 机制扩展/删除站点
-- 支持用逗号分隔的环境变量启用多个 provider
-- 支持可选的全局 `--dry-run` / `CHECKIN_DRY_RUN`
-- 适配 GitHub Actions 手动与定时执行
-- 已提供真实的 `ice.v.ua` 签到实现
-- 已提供真实的 `elysiver.h-e.top` 签到实现
-- 将“签到成功”和“今日已签到”都视为成功结果
+- `.github/workflows/daily-checkin.yml`
 
-## Tech Stack
+当前默认定时执行时间为：
 
-- Node.js 22+
-- TypeScript
-- GitHub Actions
+- **北京时间每天 00:30**
 
-## Project Structure
+### 需要配置的 Secrets
 
-```text
-.
-├─ .github/
-│  └─ workflows/
-│     └─ daily-checkin.yml
-├─ src/
-│  ├─ core/
-│  │  ├─ config.ts
-│  │  ├─ runner.ts
-│  │  └─ types.ts
-│  ├─ providers/
-│  │  ├─ elysiver.ts
-│  │  ├─ example.ts
-│  │  ├─ ice.ts
-│  │  └─ index.ts
-│  └─ index.ts
-├─ .env.example
-├─ package.json
-├─ tsconfig.json
-├─ README.md
-├─ README_EN.md
-└─ CLAUDE.md
-```
+公共变量：
 
-## How It Works
+- `CHECKIN_ENABLED`：填写要启用的网站 ID，可用值如 `ice`、`elysiver`，或 `ice,elysiver`
 
-1. 从环境变量读取启用的 provider 列表
-2. 从注册表加载可用 provider
-3. 过滤出需要执行的 provider
-4. 检查每个 provider 所需环境变量是否存在
-5. 顺序执行 provider
-6. 输出汇总结果，若有失败则返回非零退出码
+`ice.v.ua` 相关：
 
-核心入口见：`src/index.ts`
-
-## Configuration
-
-参考 `.env.example`：
-
-```env
-CHECKIN_ENABLED=ice
-# CHECKIN_DRY_RUN=true
-ICE_SUB2API_AUTH_TOKEN=
-ICE_SUB2API_USER_ID=
-ELYSIVER_COOKIE=
-ELYSIVER_USER_ID=
-```
-
-说明：
-
-- `CHECKIN_ENABLED`：逗号分隔的 provider ID 列表，例如 `ice`、`elysiver` 或 `ice,elysiver`
-- `CHECKIN_DRY_RUN`：可选；未设置时默认 `false`，仅在显式设为 `true` 时启用 dry-run
-- `ICE_SUB2API_AUTH_TOKEN`：从 `ice.v.ua` 登录后的浏览器 `localStorage.auth_token` 获取
-- `ICE_SUB2API_USER_ID`：从 `auth_user.id` 或页面 iframe 中的 `user_id` 获取
-- `ELYSIVER_COOKIE`：从 `elysiver.h-e.top` 登录后的浏览器中复制完整 Cookie 字符串，例如 `session=...; cf_clearance=...;`。`session` 和 `cf_clearance` 的顺序无所谓。
-- `ELYSIVER_USER_ID`：从 `elysiver.h-e.top` 登录后的 `localStorage.user.id` 获取
-
-说明：
-
-- 当前 `ice.v.ua` 方案依赖主站 `auth_token`，该值会过期。若用于 GitHub Actions，请在失效后手动更新对应 Secret。
-- 当前 `elysiver.h-e.top` 方案依赖整段 Cookie，Cookie 过期或 Cloudflare 变化后也需要重新复制更新。
-
-## Local Development
-
-### Install dependencies
-
-```powershell
-npm install
-```
-
-### Build
-
-```powershell
-npm run build
-```
-
-### Run `ice` in dry-run mode
-
-```powershell
-$env:CHECKIN_ENABLED="ice"
-$env:CHECKIN_DRY_RUN="true"
-$env:ICE_SUB2API_AUTH_TOKEN="dummy-token"
-$env:ICE_SUB2API_USER_ID="6702"
-npm run checkin
-```
-
-### Run `elysiver` in dry-run mode
-
-```powershell
-$env:CHECKIN_ENABLED="elysiver"
-$env:CHECKIN_DRY_RUN="true"
-$env:ELYSIVER_COOKIE="session=dummy-session; cf_clearance=dummy-clearance;"
-$env:ELYSIVER_USER_ID="19139"
-npm run checkin
-```
-
-### Run `ice` normally
-
-```powershell
-$env:CHECKIN_ENABLED="ice"
-$env:ICE_SUB2API_AUTH_TOKEN="your-auth-token"
-$env:ICE_SUB2API_USER_ID="6702"
-npm run checkin
-```
-
-### Run `elysiver` normally
-
-```powershell
-$env:CHECKIN_ENABLED="elysiver"
-$env:ELYSIVER_COOKIE="session=your-session-cookie; cf_clearance=your-cf-clearance;"
-$env:ELYSIVER_USER_ID="19139"
-npm run checkin
-```
-
-期望结果：
-
-- `ice` 成功时会执行真实签到，或返回今日已签到
-- `elysiver` 成功时会执行真实签到，或返回今日已签到
-
-## Add a New Provider
-
-1. 在 `src/providers/` 下新增一个 provider 文件
-2. 实现 `CheckInProvider` 接口
-3. 在 `src/providers/index.ts` 中注册
-4. 为该 provider 增加所需环境变量
-5. 在 GitHub Actions secrets 中配置对应值
-
-示例接口定义见：`src/core/types.ts`
-
-## GitHub Actions
-
-工作流文件：`.github/workflows/daily-checkin.yml`
-
-当前支持：
-
-- 手动触发 `workflow_dispatch`
-- 每日定时执行 `schedule`
-
-当前定时配置为：**北京时间每天 00:30**。
-由于 GitHub Actions 使用 UTC，工作流中的 cron 写法为前一天 `16:30 UTC`。
-
-你至少需要在 GitHub 仓库中配置这些 Secrets：
-
-- `CHECKIN_ENABLED`：例如 `ice`、`elysiver`，或未来使用 `ice,elysiver`
 - `ICE_SUB2API_AUTH_TOKEN`
 - `ICE_SUB2API_USER_ID`
+
+`elysiver.h-e.top` 相关：
+
 - `ELYSIVER_COOKIE`
 - `ELYSIVER_USER_ID`
 
-`CHECKIN_DRY_RUN` 不需要作为 GitHub 自动任务的常规 Secret。它更适合本地调试或手动验证时临时设置。
+说明：
 
-## Current Status
+- 只启用哪个网站，就只需要填写那个网站对应的变量。
+- 如果同时启用多个网站，就需要把对应变量都配好。
+- 这些登录材料目前仍需要你自己从浏览器中获取，并在失效后手动更新。
 
-当前仓库已经不是纯骨架状态，而是：
+## 当前情况
 
-- 已有统一调度逻辑
-- 已有 provider 注册机制
-- 已有 `example` provider
-- 已有真实可用的 `ice.v.ua` provider
-- 已有真实可用的 `elysiver.h-e.top` provider
-- 真实签到成功语义已验证
+- 项目已经可以在 GitHub Actions 中自动执行
+- 已经接入两个真实公益网站
+- 不同网站使用的登录材料不同，因此需要分别配置对应 Secrets
 
-## Roadmap
+## Future Plan
 
-- 接入更多真实公益站点
-- 支持更多登录态复用方式
-- 视需要引入浏览器自动化
-- 增加更细的日志和错误分类
-- 在未来评估更稳定的 token 更新策略
+未来会继续接入更多公益网站，并逐步完善自动签到的稳定性与可维护性。
 
 ## Notes
 
 本项目仅用于你本人授权范围内的自动签到流程。
-接入真实站点时，应遵守对应网站的使用条款与访问频率限制。
+接入真实站点时，请遵守对应网站的使用条款与访问频率限制。
