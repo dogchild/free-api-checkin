@@ -8,6 +8,8 @@ const ELYSIVER_CHECKIN_PATH = "/api/user/checkin";
 const ELYSIVER_COOKIE_ENV = "ELYSIVER_COOKIE";
 const ELYSIVER_USER_ID_ENV = "ELYSIVER_USER_ID";
 const ELYSIVER_REQUEST_TIMEOUT_MS = 15_000;
+const ELYSIVER_DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36";
 const ELYSIVER_SITE_TIME_ZONE = "Asia/Shanghai";
 const CHECK_IN_SUCCESS_TEXT = "签到成功";
 const CHECK_IN_ALREADY_DONE_TEXT = "今日已签到";
@@ -94,8 +96,14 @@ export const elysiverProvider: CheckInProvider = {
       );
     }
 
+    // Keep the input format convenient for the user: they can paste the full
+    // browser Cookie string into ELYSIVER_COOKIE. For GitHub automation we only
+    // forward the application session cookie for now, while keeping the full
+    // input shape available in case cf_clearance needs to be re-enabled later.
+    const applicationCookieHeader = buildApplicationCookieHeader(cookieHeader);
+
     context.log("Verifying the restored cookie-based login state through /api/user/self.");
-    const userSelf = await requestUserSelf(cookieHeader, expectedUserId);
+    const userSelf = await requestUserSelf(applicationCookieHeader, expectedUserId);
     const actualUserId = extractUserId(userSelf);
 
     if (!actualUserId) {
@@ -117,7 +125,7 @@ export const elysiverProvider: CheckInProvider = {
     // click. Reusing the same API gives us a server-side equivalent of the UI's
     // disabled "今日已签到" state without needing browser automation.
     context.log(`Loading the current monthly check-in stats for ${dateParts.monthKey}.`);
-    const monthStatsBefore = await requestCheckInMonth(cookieHeader, expectedUserId, dateParts.monthKey);
+    const monthStatsBefore = await requestCheckInMonth(applicationCookieHeader, expectedUserId, dateParts.monthKey);
     const todayRecordBefore = findTodayRecord(monthStatsBefore, dateParts.dateKey);
 
     if (isCheckedInToday(monthStatsBefore)) {
@@ -137,11 +145,11 @@ export const elysiverProvider: CheckInProvider = {
     }
 
     context.log("Submitting the daily check-in request.");
-    const checkInAction = await submitCheckIn(cookieHeader, expectedUserId);
+    const checkInAction = await submitCheckIn(applicationCookieHeader, expectedUserId);
     const serviceMessage = normalizeOptionalString(checkInAction.message);
 
     context.log(`Reloading the monthly check-in stats for ${dateParts.monthKey}.`);
-    const monthStatsAfter = await requestCheckInMonth(cookieHeader, expectedUserId, dateParts.monthKey);
+    const monthStatsAfter = await requestCheckInMonth(applicationCookieHeader, expectedUserId, dateParts.monthKey);
     const todayRecordAfter = findTodayRecord(monthStatsAfter, dateParts.dateKey);
 
     if (checkInAction.success === false) {
@@ -283,8 +291,43 @@ function normalizeCookieHeader(value: string | undefined): string | null {
   return normalized || null;
 }
 
+function buildApplicationCookieHeader(cookieHeader: string): string {
+  const sessionCookie = getCookieValue(cookieHeader, "session");
+
+  if (!sessionCookie) {
+    throw new Error(
+      "ELYSIVER_COOKIE does not contain a session cookie. Provide the full browser Cookie string, including session=....",
+    );
+  }
+
+  return `session=${sessionCookie}`;
+}
+
+function getCookieValue(cookieHeader: string, cookieName: string): string | null {
+  const segments = cookieHeader.split(";");
+
+  for (const segment of segments) {
+    const [namePart, ...valueParts] = segment.split("=");
+    const normalizedName = namePart?.trim();
+
+    if (normalizedName !== cookieName) {
+      continue;
+    }
+
+    const value = valueParts.join("=").trim();
+
+    return value || null;
+  }
+
+  return null;
+}
+
 function buildAuthVerificationError(response: Response, body: string): string {
   const summary = summarizeBody(body);
+
+  if (response.status === 403 && looksLikeCloudflareChallenge(body)) {
+    return `The restored login verification appears to have been blocked by a Cloudflare challenge before the request reached the NewAPI application. HTTP ${response.status} ${response.statusText}. Response: ${summary}`;
+  }
 
   if (response.status === 401 || response.status === 403) {
     return `Failed to verify the restored login because ELYSIVER_COOKIE is invalid or expired, ELYSIVER_USER_ID does not match the session, or the site requires fresher cookies. HTTP ${response.status} ${response.statusText}. Response: ${summary}`;
@@ -296,6 +339,10 @@ function buildAuthVerificationError(response: Response, body: string): string {
 function buildMonthStatsError(response: Response, body: string): string {
   const summary = summarizeBody(body);
 
+  if (response.status === 403 && looksLikeCloudflareChallenge(body)) {
+    return `Loading the monthly check-in stats appears to have been blocked by a Cloudflare challenge before the request reached the NewAPI application. HTTP ${response.status} ${response.statusText}. Response: ${summary}`;
+  }
+
   if (response.status === 401 || response.status === 403) {
     return `Failed to load the monthly check-in stats because ELYSIVER_COOKIE is invalid or expired, or ELYSIVER_USER_ID does not match the session. HTTP ${response.status} ${response.statusText}. Response: ${summary}`;
   }
@@ -306,11 +353,19 @@ function buildMonthStatsError(response: Response, body: string): string {
 function buildCheckInRequestError(response: Response, body: string): string {
   const summary = summarizeBody(body);
 
+  if (response.status === 403 && looksLikeCloudflareChallenge(body)) {
+    return `The daily check-in request appears to have been blocked by a Cloudflare challenge before the request reached the NewAPI application. HTTP ${response.status} ${response.statusText}. Response: ${summary}`;
+  }
+
   if (response.status === 401 || response.status === 403) {
     return `The daily check-in request was rejected because ELYSIVER_COOKIE is invalid or expired, or ELYSIVER_USER_ID does not match the session. HTTP ${response.status} ${response.statusText}. Response: ${summary}`;
   }
 
   return `The daily check-in request failed with ${response.status} ${response.statusText}: ${summary}`;
+}
+
+function looksLikeCloudflareChallenge(body: string): boolean {
+  return /Just a moment/i.test(body) || /cf-browser-verification/i.test(body) || /cloudflare/i.test(body);
 }
 
 function buildCheckInBusinessError(payload: ElysiverCheckInActionResponse): string {
@@ -509,6 +564,22 @@ async function requestJson(url: string, init: RequestInit): Promise<JsonResponse
 
   if (!headers.has("Accept")) {
     headers.set("Accept", "application/json, text/plain, */*");
+  }
+
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7");
+  }
+
+  if (!headers.has("Cache-Control")) {
+    headers.set("Cache-Control", "no-store");
+  }
+
+  if (!headers.has("Pragma")) {
+    headers.set("Pragma", "no-cache");
+  }
+
+  if (!headers.has("User-Agent")) {
+    headers.set("User-Agent", ELYSIVER_DEFAULT_USER_AGENT);
   }
 
   const response = await fetch(url, {
