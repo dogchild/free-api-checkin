@@ -7,11 +7,11 @@ The repository already includes:
 - A general provider-based framework
 - A side-effect-free `example` provider
 - A real integrated check-in provider for `ice.v.ua`
-- An auth-only provider for `elysiver.h-e.top`
+- A real integrated check-in provider for `elysiver.h-e.top`
 
 The current `ice.v.ua` integration reuses the main-site `auth_token + user_id`, then completes the embedded sign-in flow through `signv.ice.v.ua` without browser automation.
 
-The current `elysiver.h-e.top` integration only verifies whether restoration based on the full Cookie header still works. Its custom daily sign-in logic has not been implemented yet.
+The current `elysiver.h-e.top` integration reuses a cookie-based session, verifies `/api/user/self`, then calls `/api/user/checkin` to complete the daily sign-in flow. Both a successful sign-in and an already-completed-today state are treated as success.
 
 ## Features
 
@@ -21,7 +21,7 @@ The current `elysiver.h-e.top` integration only verifies whether restoration bas
 - Optional global `--dry-run` / `CHECKIN_DRY_RUN`
 - Designed for manual and scheduled GitHub Actions execution
 - Includes a real `ice.v.ua` check-in implementation
-- Includes auth restoration verification for `elysiver.h-e.top`
+- Includes a real `elysiver.h-e.top` check-in implementation
 - Treats both `签到成功` and `今日已签到` as successful outcomes
 
 ## Tech Stack
@@ -92,7 +92,7 @@ Meaning:
 Notes:
 
 - The current `ice.v.ua` approach depends on the main-site `auth_token`, which will expire over time. If you use it in GitHub Actions, you must manually refresh the matching secret when it expires.
-- The current `elysiver.h-e.top` provider is only an auth restoration probe. It confirms that a manually copied full Cookie string still works, but it does not implement the real daily sign-in flow yet.
+- The current `elysiver.h-e.top` approach depends on the full Cookie string. When the cookie expires or Cloudflare behavior changes, you must copy and update it again.
 
 ## Local Development
 
@@ -118,7 +118,7 @@ $env:ICE_SUB2API_USER_ID="6702"
 npm run checkin
 ```
 
-### Run the `elysiver` auth probe in dry-run mode
+### Run `elysiver` in dry-run mode
 
 ```powershell
 $env:CHECKIN_ENABLED="elysiver"
@@ -137,7 +137,7 @@ $env:ICE_SUB2API_USER_ID="6702"
 npm run checkin
 ```
 
-### Run the `elysiver` auth probe normally
+### Run `elysiver` normally
 
 ```powershell
 $env:CHECKIN_ENABLED="elysiver"
@@ -149,7 +149,7 @@ npm run checkin
 Expected behavior:
 
 - `ice` performs the real daily sign-in flow or reports that today's sign-in was already completed
-- `elysiver` only verifies auth restoration and explicitly reports that daily check-in is not implemented yet
+- `elysiver` performs the real daily sign-in flow or reports that today's sign-in was already completed
 
 ## Add a New Provider
 
@@ -183,8 +183,6 @@ At minimum, configure these repository secrets:
 
 `CHECKIN_DRY_RUN` is not needed as a normal secret for scheduled GitHub execution. It is mainly useful for local debugging or temporary manual verification.
 
-Until the real `elysiver` sign-in flow is implemented, it is better to validate it through `workflow_dispatch` first instead of treating it as a fully automated scheduled provider.
-
 ## Current Status
 
 The repository is no longer just a scaffold. It now includes:
@@ -193,12 +191,11 @@ The repository is no longer just a scaffold. It now includes:
 - Provider registry
 - An `example` provider
 - A real working `ice.v.ua` provider
-- An auth-only `elysiver.h-e.top` provider
-- Verified success semantics for the actual `ice` check-in flow
+- A real working `elysiver.h-e.top` provider
+- Verified success semantics for the actual check-in flows
 
 ## Roadmap
 
-- Implement the custom `elysiver.h-e.top` sign-in flow after packet capture
 - Integrate more real public-benefit sites
 - Support more session reuse patterns
 - Introduce browser automation only if a real site requires it

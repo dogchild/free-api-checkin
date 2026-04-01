@@ -7,11 +7,11 @@
 - 通用 provider 框架
 - 一个无副作用的 `example` provider
 - 一个已接入的真实签到 provider：`ice.v.ua`
-- 一个已接入的 auth-only provider：`elysiver.h-e.top`
+- 一个已接入的真实签到 provider：`elysiver.h-e.top`
 
 `ice.v.ua` 当前通过主站 `auth_token + user_id` 复用登录态，再走 `signv.ice.v.ua` 的嵌入式签到流程完成签到，不依赖浏览器自动化。
 
-`elysiver.h-e.top` 当前仅验证基于整段 Cookie 的 auth restoration 是否有效，尚未实现网站自定义的“立即签到”逻辑。
+`elysiver.h-e.top` 当前通过 Cookie session 复用登录态，先验证 `/api/user/self`，再调用 `/api/user/checkin` 完成签到，并将“今日已签到”视为成功。
 
 ## Features
 
@@ -21,7 +21,7 @@
 - 支持可选的全局 `--dry-run` / `CHECKIN_DRY_RUN`
 - 适配 GitHub Actions 手动与定时执行
 - 已提供真实的 `ice.v.ua` 签到实现
-- 已提供 `elysiver.h-e.top` 的登录恢复验证
+- 已提供真实的 `elysiver.h-e.top` 签到实现
 - 将“签到成功”和“今日已签到”都视为成功结果
 
 ## Tech Stack
@@ -92,7 +92,7 @@ ELYSIVER_USER_ID=
 说明：
 
 - 当前 `ice.v.ua` 方案依赖主站 `auth_token`，该值会过期。若用于 GitHub Actions，请在失效后手动更新对应 Secret。
-- 当前 `elysiver.h-e.top` 仅实现 auth restoration probe，用于确认手工复制的整段 Cookie 仍然有效，不代表已实现签到。
+- 当前 `elysiver.h-e.top` 方案依赖整段 Cookie，Cookie 过期或 Cloudflare 变化后也需要重新复制更新。
 
 ## Local Development
 
@@ -118,7 +118,7 @@ $env:ICE_SUB2API_USER_ID="6702"
 npm run checkin
 ```
 
-### Run `elysiver` auth probe in dry-run mode
+### Run `elysiver` in dry-run mode
 
 ```powershell
 $env:CHECKIN_ENABLED="elysiver"
@@ -137,7 +137,7 @@ $env:ICE_SUB2API_USER_ID="6702"
 npm run checkin
 ```
 
-### Run `elysiver` auth probe normally
+### Run `elysiver` normally
 
 ```powershell
 $env:CHECKIN_ENABLED="elysiver"
@@ -149,7 +149,7 @@ npm run checkin
 期望结果：
 
 - `ice` 成功时会执行真实签到，或返回今日已签到
-- `elysiver` 成功时只表示登录恢复验证通过，并会明确提示签到尚未实现
+- `elysiver` 成功时会执行真实签到，或返回今日已签到
 
 ## Add a New Provider
 
@@ -183,8 +183,6 @@ npm run checkin
 
 `CHECKIN_DRY_RUN` 不需要作为 GitHub 自动任务的常规 Secret。它更适合本地调试或手动验证时临时设置。
 
-在 `elysiver` 真正签到逻辑完成前，不建议把 `elysiver` 作为长期定时任务的唯一目标；更适合先通过 `workflow_dispatch` 手动验证 auth restoration。
-
 ## Current Status
 
 当前仓库已经不是纯骨架状态，而是：
@@ -193,12 +191,11 @@ npm run checkin
 - 已有 provider 注册机制
 - 已有 `example` provider
 - 已有真实可用的 `ice.v.ua` provider
-- 已有 `elysiver.h-e.top` 的 auth-only provider
+- 已有真实可用的 `elysiver.h-e.top` provider
 - 真实签到成功语义已验证
 
 ## Roadmap
 
-- 完成 `elysiver.h-e.top` 的自定义签到抓包与实现
 - 接入更多真实公益站点
 - 支持更多登录态复用方式
 - 视需要引入浏览器自动化
